@@ -27,9 +27,3 @@ rtm32 -d telnet -m 64K
 ```
 
 Conecta la terminal serie al dispositivo UART anunciado por el simulador y otra terminal al debugger Telnet. Carga `snake_32x16.bin` en el debugger y escribe `c`. Esta versión revisa el bit `0x01` del registro de estado UART.
-
-## Notas de ejecución
-
-- Los comandos de ensamblado generan un `.bin` para cada juego; el simulador debe poder acceder a ese archivo.
-- En Windows se necesita una versión de las herramientas RTM32 compatible con Windows o un entorno Linux/macOS configurado para usarlas. Los binarios incluidos en el directorio externo `rtm32\RTM32` son para Linux y macOS.
-- Las dos versiones consultan bits UART distintos. Si el teclado no responde, verifica que el simulador use el bit de estado que espera el archivo elegido.
