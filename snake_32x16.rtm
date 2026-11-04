@@ -1,0 +1,662 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+.section ".data"
+
+	
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+	tablero: .pad 512(4)
+
+	
+
+
+
+
+ 
+	cuerpo: .pad 1024(4)
+
+	
+	semilla: .word 0x2545F491
+
+	
+
+
+
+
+
+
+
+
+
+ 
+	demora_n: .word 19000
+
+	s_titulo: .asciiz "SNAKE RTM32"
+	s_ayuda:  .asciiz "W/A/S/D para mover, Q para salir.  Agranda la terminal a 32 filas."
+	s_listo:  .asciiz "Apreta una tecla para empezar..."
+	s_punt:   .asciiz "Puntaje: "
+	s_fin:    .asciiz "GAME OVER.  Puntaje final: "
+	s_gano:   .asciiz "GANASTE!  Llenaste el tablero entero.  Puntaje final: "
+	s_otra:   .asciiz "R para jugar de nuevo, Q para salir."
+
+.section ".text"
+
+
+ 
+main:
+	
+	addi $sp, $zero, 0xFFF0
+
+	
+	
+	
+	addi $s0, $zero, -0x100
+
+	jal titulo
+	jal init_partida
+	jal dibujar
+
+main.bucle:
+	jal leer_tecla
+	jal aplicar_tecla
+
+	
+	bne $a0, $zero, main.fin
+
+	jal paso
+
+	
+	bne $a0, $zero, main.muerto
+
+	
+ 
+	addi $t0, $zero, 420
+	bge $s3, $t0, main.gano
+
+	jal dibujar
+	jal delay
+	j main.bucle
+
+main.gano:
+	jal dibujar
+	jal victoria
+	j main.revancha
+
+main.muerto:
+	
+	jal dibujar
+	jal game_over
+
+
+
+ 
+main.revancha:
+	jal leer_tecla
+	beq $a0, $zero, main.revancha
+
+	ori $a0, $a0, 0x20
+	addi $t0, $zero, 'r'
+	beq $a0, $t0, main.otra_vez
+	addi $t0, $zero, 'q'
+	beq $a0, $t0, main.fin
+	j main.revancha
+
+main.otra_vez:
+	
+	jal init_partida
+	jal dibujar
+	j main.bucle
+
+main.fin:
+	
+ 
+	trap 1
+
+
+
+
+
+ 
+titulo:
+	addi $sp, $sp, -4
+	sw $ra, 0($sp)
+
+	orh $a0, $zero, .hi16 s_titulo
+	ori $a0, $a0,   .lo16 s_titulo
+	jal print_str
+	jal print_nl
+
+	orh $a0, $zero, .hi16 s_ayuda
+	ori $a0, $a0,   .lo16 s_ayuda
+	jal print_str
+	jal print_nl
+
+	orh $a0, $zero, .hi16 s_listo
+	ori $a0, $a0,   .lo16 s_listo
+	jal print_str
+	jal print_nl
+
+	addi $t2, $zero, -0x100
+	lw $t3, semilla($zero)
+
+titulo.esperar:
+	
+	addi $t3, $t3, 1
+
+	lbu $t0, 4($t2)		
+	andi $t0, $t0, 1	
+	beq $t0, $zero, titulo.esperar
+
+	lbu $t1, 0($t2)		
+	add $t3, $t3, $t1
+	sw $t3, semilla($zero)
+
+	lw $ra, 0($sp)
+	addi $sp, $sp, 4
+	jr $ra, 0
+
+
+ 
+init_partida:
+	addi $sp, $sp, -4
+	sw $ra, 0($sp)
+
+	
+	xor $t0, $t0, $t0
+	addi $t5, $zero, 512
+
+init_partida.llenar:
+	srl $t1, $t0, 5		
+	andi $t2, $t0, 31	
+
+	addi $t3, $zero, '#'
+	beq $t1, $zero, init_partida.poner	
+	addi $t4, $zero, 15
+	beq $t1, $t4, init_partida.poner	
+	beq $t2, $zero, init_partida.poner	
+	addi $t4, $zero, 31
+	beq $t2, $t4, init_partida.poner	
+
+	addi $t3, $zero, ' '
+
+init_partida.poner:
+	sb $t3, tablero($t0)
+	addi $t0, $t0, 1
+	blt $t0, $t5, init_partida.llenar
+
+	
+ 
+	addi $t3, $zero, 'o'
+
+	addi $t0, $zero, 270
+	sb $t3, tablero($t0)
+	sh $t0, cuerpo($zero)		
+
+	addi $t0, $zero, 271
+	sb $t3, tablero($t0)
+	addi $t1, $zero, 2
+	sh $t0, cuerpo($t1)		
+
+	addi $t0, $zero, 272
+	addi $t3, $zero, '@'
+	sb $t3, tablero($t0)
+	addi $t1, $zero, 4
+	sh $t0, cuerpo($t1)		
+
+	addi $s1, $zero, 272		
+	addi $s2, $zero, 1		
+	addi $s3, $zero, 3		
+	xor $s4, $s4, $s4		
+	addi $s5, $zero, 4		
+	xor $s6, $s6, $s6		
+
+	jal poner_comida
+
+	lw $ra, 0($sp)
+	addi $sp, $sp, 4
+	jr $ra, 0
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+paso:
+	addi $sp, $sp, -4
+	sw $ra, 0($sp)
+
+	xor $t5, $t5, $t5		
+
+	
+	addi $t4, $zero, 'o'
+	sb $t4, tablero($s1)
+
+	
+	add $t0, $s1, $s2
+	lbu $t1, tablero($t0)
+
+	
+	addi $t2, $zero, '*'
+	beq $t1, $t2, paso.comio
+
+	
+	lhu $t3, cuerpo($s6)
+	addi $t4, $zero, ' '
+	sb $t4, tablero($t3)
+	addi $s6, $s6, 2
+	andi $s6, $s6, 1023
+	addi $s3, $s3, -1
+
+	
+	lbu $t1, tablero($t0)
+	beq $t1, $t4, paso.avanzar
+	j paso.murio
+
+paso.comio:
+	addi $t5, $zero, 1
+
+paso.avanzar:
+	
+	addi $t4, $zero, '@'
+	sb $t4, tablero($t0)
+	addi $s1, $t0, 0
+	addi $s5, $s5, 2
+	andi $s5, $s5, 1023
+	sh $s1, cuerpo($s5)
+	addi $s3, $s3, 1
+
+	
+	beq $t5, $zero, paso.viva
+	addi $s4, $s4, 1
+	jal poner_comida
+
+paso.viva:
+	xor $a0, $a0, $a0
+	lw $ra, 0($sp)
+	addi $sp, $sp, 4
+	jr $ra, 0
+
+paso.murio:
+	
+
+ 
+	addi $t4, $zero, 'o'
+	sb $t4, tablero($t3)
+	addi $s6, $s6, -2
+	andi $s6, $s6, 1023
+	addi $s3, $s3, 1
+
+	addi $t4, $zero, '@'
+	sb $t4, tablero($s1)
+	addi $a0, $zero, 1
+	lw $ra, 0($sp)
+	addi $sp, $sp, 4
+	jr $ra, 0
+
+
+ 
+aplicar_tecla:
+	xor $t1, $t1, $t1
+	beq $a0, $zero, aplicar_tecla.nada
+
+	
+	ori $a0, $a0, 0x20
+
+	addi $t0, $zero, 'q'
+	beq $a0, $t0, aplicar_tecla.salir
+	addi $t0, $zero, 'w'
+	beq $a0, $t0, aplicar_tecla.arriba
+	addi $t0, $zero, 's'
+	beq $a0, $t0, aplicar_tecla.abajo
+	addi $t0, $zero, 'a'
+	beq $a0, $t0, aplicar_tecla.izquierda
+	addi $t0, $zero, 'd'
+	beq $a0, $t0, aplicar_tecla.derecha
+	j aplicar_tecla.nada
+
+aplicar_tecla.arriba:
+	addi $t1, $zero, -32
+	j aplicar_tecla.probar
+
+aplicar_tecla.abajo:
+	addi $t1, $zero, 32
+	j aplicar_tecla.probar
+
+aplicar_tecla.izquierda:
+	addi $t1, $zero, -1
+	j aplicar_tecla.probar
+
+aplicar_tecla.derecha:
+	addi $t1, $zero, 1
+
+aplicar_tecla.probar:
+	
+
+ 
+	add $t0, $t1, $s2
+	beq $t0, $zero, aplicar_tecla.nada
+	addi $s2, $t1, 0
+
+aplicar_tecla.nada:
+	xor $a0, $a0, $a0
+	jr $ra, 0
+
+aplicar_tecla.salir:
+	addi $a0, $zero, 1
+	jr $ra, 0
+
+
+
+
+ 
+dibujar:
+	addi $sp, $sp, -4
+	sw $ra, 0($sp)
+
+	addi $t3, $zero, 12
+
+dibujar.separador:
+	addi $t2, $zero, '\r'
+	sb $t2, 0($s0)
+	addi $t2, $zero, '\n'
+	sb $t2, 0($s0)
+	addi $t3, $t3, -1
+	bne $t3, $zero, dibujar.separador
+
+	
+	xor $t0, $t0, $t0
+	addi $t4, $zero, 512
+
+dibujar.fila:
+	addi $t1, $zero, 32
+
+dibujar.celda:
+	lbu $t2, tablero($t0)
+	sb $t2, 0($s0)
+	addi $t0, $t0, 1
+	addi $t1, $t1, -1
+	bne $t1, $zero, dibujar.celda
+
+	addi $t2, $zero, '\r'
+	sb $t2, 0($s0)
+	addi $t2, $zero, '\n'
+	sb $t2, 0($s0)
+	blt $t0, $t4, dibujar.fila
+
+	orh $a0, $zero, .hi16 s_punt
+	ori $a0, $a0,   .lo16 s_punt
+	jal print_str
+	addi $a0, $s4, 0
+	jal print32u
+
+	lw $ra, 0($sp)
+	addi $sp, $sp, 4
+	jr $ra, 0
+
+
+
+
+
+ 
+poner_comida:
+	addi $sp, $sp, -8
+	sw $ra, 0($sp)
+	sw $s7, 4($sp)
+
+	
+	addi $s7, $zero, 4000
+
+poner_comida.otra:
+	addi $s7, $s7, -1
+	beq $s7, $zero, poner_comida.fin
+
+	jal rnd
+
+	
+ 
+	srl $t0, $a0, 16
+	andi $t0, $t0, 511
+
+	lbu $t1, tablero($t0)
+	addi $t2, $zero, ' '
+	bne $t1, $t2, poner_comida.otra
+
+	addi $t1, $zero, '*'
+	sb $t1, tablero($t0)
+
+poner_comida.fin:
+	lw $ra, 0($sp)
+	lw $s7, 4($sp)
+	addi $sp, $sp, 8
+	jr $ra, 0
+
+
+
+
+
+
+ 
+rnd:
+	lw $t1, semilla($zero)
+
+	orh $t0, $zero, 0x0019
+	ori $t0, $t0,   0x660D		
+	mul $t1, $t1, $t0
+
+	orh $t0, $zero, 0x3C6E
+	ori $t0, $t0,   0xF35F		
+	add $t1, $t1, $t0
+
+	sw $t1, semilla($zero)
+	addi $a0, $t1, 0
+	jr $ra, 0
+
+
+
+
+
+
+
+
+ 
+leer_tecla:
+	addi $t2, $zero, -0x100
+	xor $a0, $a0, $a0
+
+leer_tecla.bucle:
+	lbu $t0, 4($t2)		
+	andi $t0, $t0, 1	
+	beq $t0, $zero, leer_tecla.fin
+	lbu $a0, 0($t2)		
+	j leer_tecla.bucle
+
+leer_tecla.fin:
+	jr $ra, 0
+
+
+delay:
+	lw $t0, demora_n($zero)
+
+delay.bucle:
+	addi $t0, $t0, -1
+	bne $t0, $zero, delay.bucle
+	jr $ra, 0
+
+
+game_over:
+	addi $sp, $sp, -4
+	sw $ra, 0($sp)
+
+	jal print_nl
+	orh $a0, $zero, .hi16 s_fin
+	ori $a0, $a0,   .lo16 s_fin
+	jal print_str
+	addi $a0, $s4, 0
+	jal print32u
+	jal print_nl
+
+	orh $a0, $zero, .hi16 s_otra
+	ori $a0, $a0,   .lo16 s_otra
+	jal print_str
+	jal print_nl
+
+	lw $ra, 0($sp)
+	addi $sp, $sp, 4
+	jr $ra, 0
+
+
+ 
+victoria:
+	addi $sp, $sp, -4
+	sw $ra, 0($sp)
+
+	jal print_nl
+	orh $a0, $zero, .hi16 s_gano
+	ori $a0, $a0,   .lo16 s_gano
+	jal print_str
+	addi $a0, $s4, 0
+	jal print32u
+	jal print_nl
+
+	orh $a0, $zero, .hi16 s_otra
+	ori $a0, $a0,   .lo16 s_otra
+	jal print_str
+	jal print_nl
+
+	lw $ra, 0($sp)
+	addi $sp, $sp, 4
+	jr $ra, 0
+
+
+print_str:
+	addi $t2, $zero, -0x100
+	addi $t0, $a0, 0
+
+print_str.bucle:
+	lbu $t1, 0($t0)
+	beq $t1, $zero, print_str.fin
+	sb $t1, 0($t2)
+	addi $t0, $t0, 1
+	j print_str.bucle
+
+print_str.fin:
+	jr $ra, 0
+
+
+print_nl:
+	addi $t2, $zero, -0x100
+	addi $t1, $zero, '\r'
+	sb $t1, 0($t2)
+	addi $t1, $zero, '\n'
+	sb $t1, 0($t2)
+	jr $ra, 0
+
+
+
+
+ 
+print32u:
+	addi $sp, $sp, -8
+	sw $s0, 0($sp)
+	sw $s1, 4($sp)
+
+	
+	
+	addi $s0, $a0, 0
+	xor $s1, $s1, $s1
+
+	addi $t0, $zero, 10
+	addi $t2, $zero, -0x100 
+
+	
+	bne $a0, $zero, print32u'apilar
+
+	addi $t1, $zero, '0'
+	sb $t1, 0($t2)
+	j print32u'salir
+
+print32u'apilar:
+	beq $s0, $zero, print32u'desapilar
+	
+
+	addi $s1, $s1, 1
+
+	
+	restu $t1, $s0, $t0
+
+	
+	sub $s0, $s0, $t1
+	divu $s0, $s0, $t0
+
+	
+	addi $t1, $t1, '0' 
+	addi $sp, $sp, -1
+	sb $t1, 0($sp)
+
+	j print32u'apilar
+
+print32u'desapilar:
+	
+	beq $s1, $zero, print32u'salir
+
+	lbu $t1, 0($sp)
+	sb $t1, 0($t2)
+
+	addi $s1, $s1, -1
+	addi $sp, $sp, 1
+
+	j print32u'desapilar
+
+print32u'salir:
+	addi $t1, $zero, ' '
+	sb $t1, 0($t2)
+
+	lw $s0, 0($sp)
+	lw $s1, 4($sp)
+	addi $sp, $sp, 8
+	jr $ra, 0
