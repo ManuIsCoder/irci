@@ -32,7 +32,7 @@ Para jugar, inicia el simulador RTM32 con 4 KiB de memoria usando `rtm32 -d teln
 
 Implementa un tablero de 32 columnas por 16 filas con las paredes dentro del tablero. Usa `w`, `a`, `s` y `d` para moverse, acepta mayúsculas y minúsculas, y no permite girar directamente en sentido opuesto. Al perder o completar las 420 celdas interiores, permite reiniciar con `r` o salir con `q`.
 
-Necesita 64 KiB de memoria y una terminal de al menos 32 filas. Inicia el simulador con `rtm32 -d telnet -m 64K`. Conecta la terminal serie al dispositivo UART anunciado por el simulador y otra terminal al debugger Telnet. Carga `snake_32x16.bin` en el debugger y escribe `c`. Esta versión revisa el bit `0x01` del registro de estado UART.
+Necesita 64 KiB de memoria y una terminal de al menos 32 filas. Inicia el simulador con `rtm32 -d telnet -m 64K`. Conecta la terminal serie al dispositivo UART anunciado por el simulador y otra terminal al debugger Telnet, normalmente en el puerto `4444`. Carga `snake_32x16.bin` en el debugger y escribe `c` para ejecutarlo. Esta versión revisa el bit `0x01` del registro de estado UART.
 
 ## Notas de ejecución
 
